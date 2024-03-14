@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ビデオフレームを送信</title>
+    <style>
+        #camera-stream {
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+    <h2>ビデオフレームを送信</h2>
+    <video id="camera-stream" autoplay playsinline></video>
+    <script>
+        const videoElement = document.getElementById('camera-stream');
+        let webSocket;
+
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 360 }
+                    }
+                };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoElement.srcObject = stream;
+                startWebSocket();
+                captureAndSendFrames();
+            } catch (error) {
+                console.error('カメラのアクセスに失敗しました: ', error);
+            }
+        }
+
+        function startWebSocket() {
+            webSocket = new WebSocket('wss://ls-research-project-1.glitch.me/websocket4');
+            webSocket.onopen = function(event) {
+                console.log('WebSocket接続が開かれました。');
+                webSocket.send(JSON.stringify({ status: 'sender' }));
+            };
+            webSocket.onerror = function(error) {
+                console.error('WebSocketエラー: ', error);
+            };
+        }
+
+        function captureAndSendFrames() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 640; // 希望する幅
+            canvas.height = 360; // 希望する高さ
+            const context = canvas.getContext('2d');
+
+            setInterval(() => {
+                if (webSocket.readyState === WebSocket.OPEN) {
+                    context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                    canvas.toBlob(blob => {
+                        if(blob) {
+                            webSocket.send(blob);
+                        }
+                    }, 'image/jpeg');
+                }
+            }, 100); // 100ミリ秒ごとにフレームを送信
+        }
+
+        startCamera();
+    </script>
+</body>
+</html>
